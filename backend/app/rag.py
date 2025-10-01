@@ -68,8 +68,13 @@ class QdrantStore:
         self.client = QdrantClient(url=url, timeout=10.0)
         self.collection = collection
         self.dim = dim
-        self._point_id_counter = 0
         self._ensure_collection()
+
+    @staticmethod
+    def _hash_to_id(hash_str: str) -> int:
+        """Convert a hash string to a stable numeric ID for Qdrant."""
+        # Take first 16 hex chars and convert to int (64-bit)
+        return int(hash_str[:16], 16)
 
     def _ensure_collection(self):
         try:
@@ -81,12 +86,31 @@ class QdrantStore:
             )
 
     def upsert(self, vectors: List[np.ndarray], metadatas: List[Dict]):
+        # Ensure collection exists before upserting
+        self._ensure_collection()
+
         points = []
         for v, m in zip(vectors, metadatas):
-            # Use incrementing counter as ID since Qdrant requires int or UUID
-            self._point_id_counter += 1
-            points.append(qm.PointStruct(id=self._point_id_counter, vector=v.tolist(), payload=m))
-        self.client.upsert(collection_name=self.collection, points=points)
+            h = m.get("hash")
+            if not h:
+                continue
+            # Use hash-based ID to prevent duplicates
+            point_id = self._hash_to_id(h)
+            # Check if point already exists
+            try:
+                existing = self.client.retrieve(
+                    collection_name=self.collection,
+                    ids=[point_id]
+                )
+                if existing:
+                    # Skip duplicate
+                    continue
+            except Exception:
+                # Point doesn't exist, continue with insertion
+                pass
+            points.append(qm.PointStruct(id=point_id, vector=v.tolist(), payload=m))
+        if points:
+            self.client.upsert(collection_name=self.collection, points=points)
 
     def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
         res = self.client.search(
@@ -230,9 +254,27 @@ class RAGEngine:
     def retrieve(self, query: str, k: int = 4) -> List[Dict]:
         t0 = time.time()
         qv = self.embedder.embed(query)
-        results = self.store.search(qv, k=k)
+        # Request more results to account for potential duplicates
+        results = self.store.search(qv, k=k*2)
         self.metrics.add_retrieval((time.time()-t0)*1000.0)
-        return [meta for score, meta in results]
+
+        # Deduplicate results based on hash
+        seen_hashes = set()
+        unique_results = []
+        for score, meta in results:
+            h = meta.get("hash")
+            if h and h not in seen_hashes:
+                seen_hashes.add(h)
+                unique_results.append(meta)
+            elif not h:
+                # Include items without hash (shouldn't happen, but be safe)
+                unique_results.append(meta)
+
+            # Stop once we have k unique results
+            if len(unique_results) >= k:
+                break
+
+        return unique_results[:k]
 
     def generate(self, query: str, contexts: List[Dict]) -> str:
         t0 = time.time()
