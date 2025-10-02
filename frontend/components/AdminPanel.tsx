@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { apiIngest, apiMetrics } from '../lib/api';
+import { onChatResponseReceived } from '../lib/events';
 
 export default function AdminPanel() {
   const [metrics, setMetrics] = React.useState<any>(null);
@@ -33,7 +34,12 @@ export default function AdminPanel() {
     }
   };
 
-  React.useEffect(() => { refresh(); }, []);
+  React.useEffect(() => {
+    refresh();
+    // Listen for chat responses to auto-refresh metrics
+    const cleanup = onChatResponseReceived(refresh);
+    return cleanup;
+  }, []);
 
   return (
     <div className="card">

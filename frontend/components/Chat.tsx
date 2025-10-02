@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { apiAsk } from '../lib/api';
+import { emitChatResponseReceived } from '../lib/events';
 
 type Message = {
   role: 'user' | 'assistant',
@@ -43,6 +44,8 @@ export default function Chat() {
         feedback: null
       };
       setMessages(m => [...m, ai]);
+      // Emit event to trigger metrics refresh
+      emitChatResponseReceived();
     } catch (e:any) {
       setMessages(m => [...m, {
         role: 'assistant',
@@ -67,36 +70,6 @@ export default function Chat() {
     }));
   };
 
-  const exportChat = () => {
-    if (messages.length === 0) {
-      alert('No messages to export');
-      return;
-    }
-
-    const exportData = {
-      exported_at: new Date().toISOString(),
-      message_count: messages.length,
-      messages: messages.map((msg, idx) => ({
-        index: idx + 1,
-        role: msg.role,
-        content: msg.content,
-        citations: msg.citations,
-        feedback: msg.feedback,
-        error: msg.error
-      }))
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `chat-export-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div style={{
       display: 'flex',
@@ -108,63 +81,26 @@ export default function Chat() {
       <div style={{
         padding: '20px 24px',
         borderBottom: '1px solid #e2e8f0',
-        background: 'white',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start'
+        background: 'white'
       }}>
-        <div>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: 600,
-            margin: 0,
-            color: '#0f172a',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            💬 Chat Assistant
-          </h2>
-          <p style={{
-            fontSize: '13px',
-            color: '#64748b',
-            margin: '4px 0 0 0'
-          }}>
-            Ask questions about company policies
-          </p>
-        </div>
-
-        {messages.length > 0 && (
-          <button
-            onClick={exportChat}
-            style={{
-              padding: '8px 16px',
-              background: 'white',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: 500,
-              color: '#475569',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = '#3b82f6';
-              e.currentTarget.style.color = '#3b82f6';
-              e.currentTarget.style.background = '#f8fafc';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = '#e2e8f0';
-              e.currentTarget.style.color = '#475569';
-              e.currentTarget.style.background = 'white';
-            }}
-          >
-            📥 Export Chat
-          </button>
-        )}
+        <h2 style={{
+          fontSize: '20px',
+          fontWeight: 600,
+          margin: 0,
+          color: '#0f172a',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          💬 Chat Assistant
+        </h2>
+        <p style={{
+          fontSize: '13px',
+          color: '#64748b',
+          margin: '4px 0 0 0'
+        }}>
+          Ask questions about company policies
+        </p>
       </div>
 
       {/* Messages Container */}

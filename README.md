@@ -28,24 +28,29 @@ Frontend (Next.js) → Backend API (FastAPI) → RAG Engine
 
 ### Prerequisites
 - Docker & Docker Compose
-- OpenAI API key (provided in `.env.example`)
+- **Optional**: OpenAI API key (for better answers)
 
 ### Installation
 
 1. **Clone and navigate to the project**:
 ```bash
-cd ai-policy-helper-starter-pack
+cd ai-policy-helper
 ```
 
-2. **Copy environment file**:
+2. **Copy environment file** (optional - works without this):
 ```bash
 cp .env.example .env
 ```
 
 The `.env` file is pre-configured with:
-- `LLM_PROVIDER=openai` (required for demo)
-- `OPENAI_API_KEY=<provided-key>`
+- `LLM_PROVIDER=stub` (works offline, zero configuration)
+- `EMBEDDING_MODEL=local-384` (fast startup)
 - `VECTOR_STORE=qdrant`
+
+💡 **For production/demo**: Edit `.env` and set:
+- `LLM_PROVIDER=openai`
+- `OPENAI_API_KEY=sk-proj-...`
+- `EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2`
 
 3. **Start all services**:
 ```bash
@@ -200,28 +205,28 @@ Health check endpoint.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_PROVIDER` | `openai` | `openai`, `ollama`, or `stub` |
-| `OPENAI_API_KEY` | - | Required for OpenAI provider |
+| `LLM_PROVIDER` | `stub` | `stub` (offline), `openai`, or `ollama` |
+| `OPENAI_API_KEY` | - | Required only for OpenAI provider |
 | `VECTOR_STORE` | `qdrant` | `qdrant` or `memory` |
 | `COLLECTION_NAME` | `policy_helper` | Qdrant collection name |
 | `CHUNK_SIZE` | `700` | Tokens per chunk |
 | `CHUNK_OVERLAP` | `80` | Overlapping tokens |
-| `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model identifier |
+| `EMBEDDING_MODEL` | `local-384` | Embedding model (use `sentence-transformers/all-MiniLM-L6-v2` for better quality) |
 
 ### Switching LLM Providers
 
-**OpenAI** (Recommended for demo):
+**Stub** (Default - zero configuration):
+```bash
+LLM_PROVIDER=stub
+```
+The stub LLM generates deterministic answers with citations. Works completely offline.
+
+**OpenAI** (Recommended for production/demo):
 ```bash
 LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-proj-...
 ```
-
-**Stub** (Offline mode):
-```bash
-LLM_PROVIDER=stub
-```
-
-The stub LLM generates deterministic answers for testing without API calls.
+Provides intelligent, natural language answers with better citation integration.
 
 ## 🔧 Development
 
@@ -306,23 +311,23 @@ ai-policy-helper-starter-pack/
 2. **Overlap**: Higher overlap (100+) improves context but increases storage
 3. **k Parameter**: Lower k (2-3) for faster queries, higher k (5-8) for better coverage
 4. **Caching**: Add Redis for frequent queries
-5. **Embeddings**: Already using sentence-transformers for better semantic search
+5. **Embeddings**: Switch to `sentence-transformers/all-MiniLM-L6-v2` for better semantic search (default uses hash-based for fast startup)
 
 ## 🚨 Trade-offs & Limitations
 
 ### Current Implementation
 
 **Pros**:
-- ✅ Semantic embeddings with sentence-transformers for high-quality retrieval
-- ✅ Fast development iteration
-- ✅ Works offline (with stub LLM, embeddings require one-time model download)
+- ✅ Fast startup (~5-10s) with local hash-based embeddings
+- ✅ Works completely offline with stub LLM
+- ✅ Easy to switch to semantic embeddings for production
 - ✅ Accurate citations from correct source documents
 
 **Cons**:
+- ❌ Default embeddings are hash-based (poor semantic quality - switch to sentence-transformers for production)
 - ❌ No reranking or MMR for diversity
 - ❌ Single-threaded ingestion
 - ❌ Limited to ~100 documents
-- ❌ Requires ~80MB model download on first run
 
 ### Production Considerations
 
@@ -364,6 +369,9 @@ CORS is configured to `*` for local development. For production, update `main.py
 allow_origins=["https://yourdomain.com"]
 ```
 
+### Embeddings/LLM
+With no keys, stub models run by default so the app always works. The default embedding model is `local-384` (hash-based) for instant startup. For better semantic quality, switch to `EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2` in `.env`.
+
 ## 📝 Next Steps
 
 ### Phase 1 (Immediate)
@@ -373,10 +381,10 @@ allow_origins=["https://yourdomain.com"]
 - [ ] Export chat to PDF
 
 ### Phase 2 (Short-term)
-- [ ] Switch to sentence-transformers embeddings
 - [ ] Implement MMR reranking
 - [ ] Add streaming responses
 - [ ] Redis caching layer
+- [ ] Add conversation history persistence
 
 ### Phase 3 (Medium-term)
 - [ ] User authentication
@@ -404,11 +412,3 @@ This is a take-home assignment project. Not intended for production use without 
 
 ---
 
-**Candidate Notes**:
-- Implementation time: ~20 hours
-- All acceptance tests passing ✅
-- UI polished with proper error handling ✅
-- Comprehensive test coverage ✅
-- Production-ready logging & monitoring ✅
-
-For demo video and further questions, please contact the candidate.
