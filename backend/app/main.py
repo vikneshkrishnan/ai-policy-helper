@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from typing import List
 import logging
 from .models import IngestResponse, AskRequest, AskResponse, MetricsResponse, Citation, Chunk
@@ -27,19 +27,35 @@ app.add_middleware(
 
 engine = RAGEngine()
 
+@app.get("/")
+def root():
+    """Root health check endpoint."""
+    logger.info("Root health check requested")
+    return {"status": "ok", "service": "AI Policy & Product Helper"}
+
 @app.get("/api/health")
 def health():
     """Health check endpoint."""
     logger.info("Health check requested")
     return {"status": "ok"}
 
-@app.get("/api/metrics", response_model=MetricsResponse)
+@app.get("/metrics", response_model=MetricsResponse)
 def metrics():
     """Get system metrics including document counts and performance stats."""
     logger.info("Metrics requested")
     s = engine.stats()
     logger.info(f"Current metrics: {s['total_docs']} docs, {s['total_chunks']} chunks")
     return MetricsResponse(**s)
+
+@app.get("/api/metrics", response_model=MetricsResponse)
+def api_metrics():
+    """Get system metrics including document counts and performance stats (API version)."""
+    return metrics()
+
+@app.get("/favicon.ico")
+def favicon():
+    """Return empty favicon to avoid 404 errors."""
+    return Response(content="", media_type="image/x-icon")
 
 @app.post("/api/ingest", response_model=IngestResponse)
 def ingest():
